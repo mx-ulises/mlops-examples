@@ -15,5 +15,7 @@ echo "----------------------------------------\n"
 echo "Printing admin-user Service Account Token"
 echo "----------------------------------------"
 kubectl -n kubernetes-dashboard create token admin-user
+echo "----------------------------------------\n"
+echo "Access Kubernetes Dashboard in:\n\n  - http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/\n"
 echo "----------------------------------------"
 
