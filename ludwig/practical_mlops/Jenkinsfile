@@ -1,0 +1,47 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml '''
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+          - name: git
+            image: alpine/git:latest
+            command:
+            - cat
+            tty: true
+          - name: config
+            image: alpine:latest
+            command:
+            - cat
+            tty: true
+          - name: ludwig
+            image: ludwigai/ludwig:master
+            command:
+            - cat
+            tty: true
+        '''
+    }
+  }
+  stages {
+    stage('Run maven') {
+      steps {
+        container('git') {
+          sh 'git clone https://github.com/mx-ulises/mlops-examples.git'
+        }
+        container('config') {
+          sh 'mkdir data'
+          sh 'cp mlops-examples/ludwig/practical_mlops/data/train.csv data/train.csv'
+          sh 'mkdir src'
+          sh 'cp mlops-examples/ludwig/practical_mlops/src/config.yaml src/config.yaml'
+          sh 'mkdir results'
+          sh 'rm -rf mlops-examples'
+        }
+        container('ludwig') {
+          sh 'ludwig experiment --dataset data/train.csv --config src/config.yaml --output_directory results'
+        }
+      }
+    }
+  }
+}
