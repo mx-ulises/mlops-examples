@@ -2,30 +2,49 @@ pipeline {
   agent {
     kubernetes {
       yaml '''
-        apiVersion: v1
-        kind: Pod
-        spec:
-          containers:
-          - name: git
-            image: alpine/git:latest
-            command:
-            - cat
-            tty: true
-          - name: config
-            image: alpine:latest
-            command:
-            - cat
-            tty: true
-          - name: ludwig
-            image: ludwigai/ludwig:master
-            command:
-            - cat
-            tty: true
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: git
+    image: alpine/git:latest
+    command:
+    - cat
+    tty: true
+  - name: config
+    image: alpine:latest
+    command:
+    - cat
+    tty: true
+  - name: ludwig
+    image: ludwigai/ludwig:master
+    command:
+    - cat
+    tty: true
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:debug
+    imagePullPolicy: Always
+    command:
+    - sleep
+    args:
+    - 9999999
+    volumeMounts:
+      - name: jenkins-docker-cfg
+        mountPath: /kaniko/.docker
+  volumes:
+  - name: jenkins-docker-cfg
+    projected:
+      sources:
+      - secret:
+          name: docker-credentials
+          items:
+            - key: .dockerconfigjson
+              path: config.json
         '''
     }
   }
   stages {
-    stage('Run maven') {
+    stage('Prepare Dataset and Configurations') {
       steps {
         container('git') {
           sh 'git clone https://github.com/mx-ulises/mlops-examples.git'
@@ -35,11 +54,30 @@ pipeline {
           sh 'cp mlops-examples/ludwig/practical_mlops/data/train.csv data/train.csv'
           sh 'mkdir src'
           sh 'cp mlops-examples/ludwig/practical_mlops/src/config.yaml src/config.yaml'
+          sh 'cp mlops-examples/ludwig/practical_mlops/Dockerfile .'
           sh 'mkdir results'
           sh 'rm -rf mlops-examples'
         }
+      }
+    }
+    stage('Train with ludwig') {
+      steps {
         container('ludwig') {
           sh 'ludwig experiment --dataset data/train.csv --config src/config.yaml --output_directory results'
+        }
+      }
+    }
+    stage('Bundle Container and push') {
+      steps {
+        container('config') {
+          sh 'mkdir model'
+          sh 'cp results/experiment_run/model/* model/'
+          sh 'rm -rf data src results'
+        }
+        container(name: 'kaniko', shell: '/busybox/sh') {
+          sh '''#!/busybox/sh
+            /kaniko/executor --context `pwd` --dockerfile Dockerfile --destination mxulises/ludwig-test:latest
+          '''
         }
       }
     }
