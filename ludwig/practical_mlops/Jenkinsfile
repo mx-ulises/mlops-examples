@@ -71,8 +71,10 @@ spec:
       steps {
         container('config') {
           sh 'mkdir model'
-          sh 'cp results/experiment_run/model/* model/'
-          sh 'rm -rf data src results'
+          sh 'mv results/experiment_run/model ./'
+          sh 'rm -rf data'
+          sh 'rm -rf results'
+          sh 'rm -rf src'
         }
         container(name: 'kaniko', shell: '/busybox/sh') {
           sh '''#!/busybox/sh
